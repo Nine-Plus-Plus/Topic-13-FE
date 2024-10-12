@@ -66,7 +66,7 @@ const ClassManager = () => {
       const token = localStorage.getItem('token');
       try {
         const response = await getClassBySemesterId(selectedSemester, token);
-        setClasses(response?.classDTOList);
+        setClasses(response?.classDTOList || []);
         console.log(response);
       } catch (err) {
         setError(err?.message || 'Đã xảy ra lỗi');
@@ -119,17 +119,27 @@ const ClassManager = () => {
       const values = await form.validateFields();
       const updateData = {
         ...form.getFieldsValue(),
-        mentor: { id: form.getFieldsValue().mentorId },
-        semester: { id: form.getFieldsValue().semesterId }
+        mentor: { id: values.mentorId },
+        semester: { id: values.semesterId }
       };
-      console.log(classes);
 
       const response = await updateClass(selectedClass.id, updateData, token);
       if (response && response?.statusCode === 200) {
-        setClasses(classes.map(classU => (classU.id === response.classDTO.id ? response.classDTO : classU)));
+        // Kiểm tra xem semesterId đã thay đổi hay chưa
+        const updatedClass = response.classDTO; // Lớp học sau khi cập nhật
+        const isSameSemester = updatedClass.semester.id === selectedClass.semester.id;
+
+        if (!isSameSemester) {
+          // Nếu semesterId khác, loại bỏ lớp học khỏi danh sách
+          setClasses(classes.filter(classU => classU.id !== selectedClass.id));
+        } else {
+          // Nếu semesterId không thay đổi, cập nhật lớp học trong danh sách
+          setClasses(classes.map(classU => (classU.id === updatedClass.id ? updatedClass : classU)));
+        }
         setIsUpdateModalVisible(false);
         message.success('Class updated successfully');
       } else {
+        console.log('Update Data:', updateData);
         message.error('Failed to update class');
       }
     } catch (error) {
@@ -162,7 +172,7 @@ const ClassManager = () => {
     form.setFieldsValue({
       className: classU.className,
       semesterId: classU.semester.id,
-      mentorId: classU?.mentor?.mentorCode || ''
+      mentorId: classU?.mentor?.id || ''
     });
     setIsUpdateModalVisible(true);
   };
